@@ -1,13 +1,16 @@
 #pragma once
-#include <common.h>
+#include "common.h"
 
 
 
-uint64_t get_time_ms() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
+uint64_t get_time_ms();
 
+string get_fmt_time();
+
+void set_thread_name(string name);
+
+string get_thread_name();
+
+string get_filename_from_path(const string& path);
 
 

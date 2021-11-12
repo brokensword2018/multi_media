@@ -37,20 +37,30 @@ enum LogLevel {
 
 const static map<LogLevel, string> log_level_map = 
 {
-    {debug, "debug"},
-    {info, "info"},
-    {warning, "warning"},
-    {error, "error"},
+    {debug, "D"},
+    {info, "I"},
+    {warning, "W"},
+    {error, "E"},
 };
 
 class LogContext {
 public:
-    LogContext(const string& time, const LogLevel level, const uint32_t tid, const string& thread_name, 
-              const std::string& file_name, const uint32_t line);
+    LogContext(const LogLevel level, const std::string& filename, const uint32_t line, const string& func_name);
     ~LogContext();
-
+    template<typename T>
+    LogContext& operator<<(T&& val) {
+        _log << std::forward<T>(val);
+        return *this;
+    }
 
 private:
-    string _prefix;
+    ostringstream _prefix;
     ostringstream _log;
 };
+
+
+#define WriteLog(level) LogContext(level, __FILE__, __LINE__, __FUNCTION__)
+#define dlog WriteLog(debug)
+#define ilog WriteLog(info)
+#define wlog WriteLog(warning)
+#define elog WriteLog(error)
