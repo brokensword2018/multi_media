@@ -15,8 +15,7 @@ using namespace std;
 void print () {
     for (int i = 0; i < 100000; ++i) {
         ostringstream oss;
-        oss << "i=" << i << " " << gettid() << " say hello wrold";
-        AsyncLogWriter::instance().write(oss.str());
+        ilog << "i=" << i << " " << gettid() << " say hello wrold";
     }
 }
 
