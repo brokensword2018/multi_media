@@ -31,10 +31,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(tests)
 
 # 编译player
-find_package(Qt5)
-if(Qt5_FOUND)
-    add_subdirectory(player) 
-endif(Qt5_FOUND)
+add_subdirectory(player) 
 
 
 

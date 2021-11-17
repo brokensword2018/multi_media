@@ -8,6 +8,10 @@
 #include "util/logger.h"
 #include "util/util.h"
 
+extern "C" {
+    #include "libavformat/avformat.h"
+}
+
 
 using namespace std;
 
@@ -30,6 +34,8 @@ public:
 
 int main() {
 
+    AVFormatContext* format_context = NULL;
+    avformat_open_input(&format_context, "666", NULL, NULL);
     test t;
     t.print();
    

@@ -1,23 +1,4 @@
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
+aux_source_directory(. PLAYER_SRC_LIST)
 
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-if(CMAKE_VERSION VERSION_LESS "3.7.0")
-    set(CMAKE_INCLUDE_CURRENT_DIR ON)
-endif()
-
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
-
-add_executable(player
-  main.cpp
-  mainwindow.cpp
-  mainwindow.h
-  mainwindow.ui
-)
-
-target_link_libraries(player PRIVATE Qt5::Widgets)
+add_executable(player ${PLAYER_SRC_LIST})
+target_link_libraries(player ${CMAKE_PROJECT_NAME}_static  avformat avcodec avutil swscale z m SDL2)
