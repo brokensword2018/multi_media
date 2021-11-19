@@ -1,0 +1,14 @@
+prefix=/home/hejilin/software/ffmpeg
+exec_prefix=${prefix}
+libdir=/home/hejilin/software/ffmpeg/lib
+includedir=/home/hejilin/software/ffmpeg/include
+
+Name: libavcodec
+Description: FFmpeg codec library
+Version: 58.91.100
+Requires: 
+Requires.private: libswresample >= 3.7.100, libavutil >= 56.51.100
+Conflicts:
+Libs: -L${libdir}  -lavcodec 
+Libs.private: -pthread -lm -llzma -lz -lfdk-aac -lspeex -lx264 -lx265
+Cflags: -I${includedir}

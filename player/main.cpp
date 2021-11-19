@@ -10,7 +10,7 @@
 
 extern "C" {
     #include "libavformat/avformat.h"
-    #include "SDL/SDL.h"
+    #include "SDL2/SDL.h"
 }
 
 
@@ -40,7 +40,8 @@ int main() {
 
     SDL_CreateMutex();
     AVFormatContext* format_context = NULL;
-    avformat_open_input(&format_context, "666", NULL, NULL);
+    int ret = avformat_open_input(&format_context, "666", NULL, NULL);
+    ilog << ret;
     test t;
     t.print();
    
