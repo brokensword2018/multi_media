@@ -9,5 +9,7 @@
 #include <sys/prctl.h>
 #include <unistd.h>
 
+#include "logger.h"
+
 
 using namespace std;

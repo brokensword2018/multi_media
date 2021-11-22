@@ -1,4 +1,4 @@
-if [ $1 = '-r' ]; then
+if [[ $1 = '-r' ]]; then
     echo "compile in clean state"
     rm -rf build
 fi
