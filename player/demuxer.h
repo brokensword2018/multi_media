@@ -11,7 +11,7 @@ extern "C" {
 class Demuxer {
 public:
     Demuxer(const string& filename);
-    bool getAVpacket(AVPacket& pkt);
+    bool get_avpacket(AVPacket& pkt);
     ~Demuxer();
 
 private:

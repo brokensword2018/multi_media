@@ -13,6 +13,6 @@ Demuxer::~Demuxer() {
 }
 
 
-bool Demuxer::getAVpacket(AVPacket& pkt) {
+bool Demuxer::get_avpacket(AVPacket& pkt) {
     return av_read_frame(_format_context, &pkt) == 0;
 }

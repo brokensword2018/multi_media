@@ -6,7 +6,7 @@ void Player::play(const string& filename) {
 
     for (int i = 0; i < 1000; ++i) {
         AVPacket pkt;
-        _demuxer->getAVpacket(pkt);
+        _demuxer->get_avpacket(pkt);
         ilog << pkt.stream_index;
     }
 }
