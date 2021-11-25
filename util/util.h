@@ -13,4 +13,18 @@ string get_thread_name();
 
 string get_filename_from_path(const string& path);
 
+#define StrPrinter _StrPrinter()
+class _StrPrinter : public string {
+public:
+    template<class T>
+    _StrPrinter& operator << (T&& data) {
+        _ss << std::forward<T>(data);
+        string::operator=(_ss.str());//必须要显示调用父类的，子类有默认的operator=
+        return *this;
+    }
+
+private:
+    stringstream _ss;
+};
+
 

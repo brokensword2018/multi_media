@@ -14,6 +14,8 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
+#include <sstream>
 
 #include "logger.h"
 

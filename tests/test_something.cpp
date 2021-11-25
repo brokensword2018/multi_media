@@ -34,10 +34,9 @@ public:
 
 int main() {
 
-    AVFormatContext* format_context = NULL;
-    avformat_open_input(&format_context, "666", NULL, NULL);
-    test t;
-    t.print();
+    ilog << (StrPrinter << 5 << "  " << " + " << 7);
+    string str = (StrPrinter << 5 << "  " << " + " << 7);
+    ilog << str;
    
     AsyncLogWriter::instance().join();
     return 0;

@@ -86,11 +86,14 @@ bool Queue<T>::pop(T& msg) {
 template<class T>
 void Queue<T>::end_input() {
     _end_input = true;
+    _not_empty.notify_all();
 }
 
 template<class T>
 void Queue<T>::quit() {
     _quit = true;
+    _not_empty.notify_all();
+    _not_full.notify_all();
 }
 
 template<class T>

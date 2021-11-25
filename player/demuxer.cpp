@@ -23,9 +23,10 @@ bool Demuxer::get_avpacket(AVPacket& pkt) {
 }
 
 
-int Demuxer::audio_index() {
-    return _audio_index;
+AVStream* Demuxer::video_stream() const {
+    return _format_context->streams[_video_index];
 }
-int Demuxer::video_index() {
-    return _video_index;
+
+AVStream* Demuxer::audio_stream() const {
+    return _format_context->streams[_audio_index];
 }

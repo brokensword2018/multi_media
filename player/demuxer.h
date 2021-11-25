@@ -13,8 +13,8 @@ public:
     Demuxer(const string& filename);
     bool get_avpacket(AVPacket& pkt);
     ~Demuxer();
-    int audio_index();
-    int video_index();
+    AVStream* video_stream() const;
+    AVStream* audio_stream() const;
 
 private:
     AVFormatContext* _format_context = nullptr;
