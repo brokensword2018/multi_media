@@ -50,38 +50,52 @@ void Player::demux() {
 }
 
 void Player::decode_audio() {
-    set_thread_name("decode_audio");
+    set_thread_name("audio decoder");
     static int packet_count = 0;
     static int frame_count = 0;
     while (true) {
         unique_ptr<AVPacket, function<void(AVPacket*)>> packet;
         if (!_audio_packet_queue->pop(packet)) {
             ilog << "no more audio packet to decode";
-            _audio_frame_queue->end_input();
             break;
         }       
         packet_count += 1;
 
         while(!_audio_decoder->send(packet.get())) { // 尝试至发送成功。
             unique_ptr<AVFrame, function<void(AVFrame*)>> frame(av_frame_alloc(), [](AVFrame* p) { av_frame_free(&p); } );
-            while (_audio_decoder->receive(frame.get())) {
+            while (_audio_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
-                ilog << frame->pts * ffmpeg::avrational_to_double(_demuxer->audio_stream()->time_base);
+                // ilog << frame->pts * av_q2d(_demuxer->audio_stream()->time_base);
+                // TODO 处理解码的帧
             }
-
+        }
+    }
+    while (true) {
+        unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
+        int ret = _audio_decoder->receive(frame.get());
+        if (ret == AVERROR(EAGAIN)) {
+            if (!_audio_decoder->send(nullptr)) {
+                elog << " fail to flush video decoder";
+            }
+            continue;
+        } else if (ret == 0) {
+            frame_count += 1;
+            // ilog << "pts " << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+            // TODO 处理解码的帧
+        } else if (ret == AVERROR_EOF) {
+            break;
         }
     }
     ilog << "packet num " << packet_count << " frame num " << frame_count;
 }
 
 void Player::decode_video() {
-    set_thread_name("decode_video");
+    set_thread_name("video decoder");
     static int packet_count = 0;
     static int frame_count = 0;
     while (true) {
         unique_ptr<AVPacket, function<void(AVPacket *)>> packet;
         if (!_video_packet_queue->pop(packet)) {
-            _video_frame_queue->end_input();
             ilog << "no more video packet to decode";
             break;
         }
@@ -89,11 +103,32 @@ void Player::decode_video() {
 
         while (!_video_decoder->send(packet.get())) { // 尝试至发送成功。
             unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
-            while (_video_decoder->receive(frame.get())) {
+            while (_video_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
-                ilog << frame->pts * ffmpeg::avrational_to_double(_demuxer->video_stream()->time_base);
+                // ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+                // TODO 处理解码的帧
             }
         }
     }
+
+    while (true) {
+        unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
+        int ret = _video_decoder->receive(frame.get());
+        if (ret == AVERROR(EAGAIN)) {
+            if (!_video_decoder->send(nullptr)) {
+                elog << " fail to flush video decoder";
+            }
+            continue;
+        }
+        else if (ret == 0) {
+            frame_count += 1;
+            // ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+            // TODO 处理解码的帧
+        } 
+        else if (ret == AVERROR_EOF) {
+            break;
+        } 
+    }
+
     ilog << "packet num " << packet_count << " frame num " << frame_count;
 }

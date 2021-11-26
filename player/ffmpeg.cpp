@@ -23,10 +23,6 @@ string err_string(const int error_code) {
     return str;
 }
 
-double avrational_to_double(AVRational rational) {
-    return (double)rational.num / rational.den;
-}
-
 int check(const int error_code) {
     if (error_code < 0) {
         throw FfmpegError(error_code);

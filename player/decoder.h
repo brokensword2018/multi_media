@@ -15,7 +15,7 @@ public:
     ~Decoder();
     const AVCodecContext* codec_context() const;
     bool send(AVPacket* packet);
-    bool receive(AVFrame* frame);
+    int receive(AVFrame* frame);
 private:
     AVCodecContext* _codec_context = nullptr;
 };

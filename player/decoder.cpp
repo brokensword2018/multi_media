@@ -13,6 +13,7 @@ Decoder::Decoder(const AVCodecParameters* codec_par) {
     if (!_codec_context) {
         throw ffmpeg::FfmpegError(StrPrinter << "alloc context fail unsupported codec id" << codec_par->codec_id);
     }
+    ilog << codec_par->codec_id;
     ffmpeg::check(avcodec_parameters_to_context(_codec_context, codec_par));
     ffmpeg::check(avcodec_open2(_codec_context, codec, nullptr));
 }
@@ -35,12 +36,13 @@ bool Decoder::send(AVPacket* packet) {
     }
 }
 
-bool Decoder::receive(AVFrame* frame) {
+int Decoder::receive(AVFrame* frame) {
     int ret = avcodec_receive_frame(_codec_context, frame);
+    ilog << "ret " << ret  << "  codecid  " << _codec_context->codec_id;
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-        return false; 
+        return ret; 
     } else {
         ffmpeg::check(ret);
-        return true;
+        return ret;
     }
 }

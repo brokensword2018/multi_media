@@ -18,8 +18,6 @@ public:
 
 string err_string(const int error_code);
 
-double avrational_to_double(AVRational rational);
-
 int check(const int error_code);
 
 
