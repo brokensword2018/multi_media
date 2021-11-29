@@ -38,7 +38,6 @@ bool Decoder::send(AVPacket* packet) {
 
 int Decoder::receive(AVFrame* frame) {
     int ret = avcodec_receive_frame(_codec_context, frame);
-    ilog << "ret " << ret  << "  codecid  " << _codec_context->codec_id;
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
         return ret; 
     } else {

@@ -1,6 +1,8 @@
 #include "display.h"
 #include <stdexcept>
 
+#include "player.h"
+
 template <typename T>
 inline T check_SDL(T value, const std::string &message) {
 	if (!value) {
@@ -12,14 +14,14 @@ inline T check_SDL(T value, const std::string &message) {
 }
 
 SDL::SDL() {
-	check_SDL(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER), "init");
+	check_SDL(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO), "init");
 }
 
 SDL::~SDL() {
 	SDL_Quit();
 }
 
-Display::Display(const unsigned width, const unsigned height) :
+Display::Display(const unsigned width, const unsigned height, AVCodecParameters* audio_codec_par, Player* player) :
 	window_{check_SDL(SDL_CreateWindow(
 		"player", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		width, height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE),
@@ -38,6 +40,25 @@ Display::Display(const unsigned width, const unsigned height) :
 	SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
 	SDL_RenderClear(renderer_.get());
 	SDL_RenderPresent(renderer_.get());
+
+	_player = player;
+
+	// 音频的初始化
+	SDL_AudioSpec wanted_spec;
+    wanted_spec.freq = audio_codec_par->sample_rate;
+    wanted_spec.format = AUDIO_S16;
+    wanted_spec.channels = audio_codec_par->channels;
+    wanted_spec.silence = 0;
+    wanted_spec.samples = 1024;
+    wanted_spec.userdata = this;
+    wanted_spec.callback = [](void *userdata, Uint8 *stream, int len) {
+        Display *_this = (Display *) userdata;
+        _this->on_req_pcm((char *) stream, len);
+    };
+    if (SDL_OpenAudio(&wanted_spec, nullptr) < 0) {
+        throw std::runtime_error("SDL_OpenAudio failed");
+    }
+
 }
 
 void Display::refresh(
@@ -51,6 +72,25 @@ void Display::refresh(
 	SDL_RenderCopy(renderer_.get(), texture_.get(), nullptr, nullptr);
 	SDL_RenderPresent(renderer_.get());
 }
+
+
+void Display::on_req_pcm(char* stream, int len) {
+	SDL_memset(stream, 0, len);
+	string pcm = _player->get_pcm();
+	len = min(len, (int)pcm.size());
+    memcpy(stream, pcm.data(), len);
+    return;
+}
+
+
+void Display::start_play_audio() {
+	SDL_PauseAudio(0);
+}
+
+void Display::stop_play_audio() {
+	SDL_PauseAudio(1);
+}
+
 
 void Display::input() {
 	if (SDL_PollEvent(&event_)) {

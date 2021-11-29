@@ -16,13 +16,16 @@ class Player {
 public:
     Player(const string& filename);
     void play();
+    string get_pcm();
 
 private:
     void demux();
     void decode_audio();
+    void convert_audio_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame);
     void decode_video();
-    void convert_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame);
+    void convert_video_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame);
     void display();
+
 
 private:
     unique_ptr<Demuxer> _demuxer;
@@ -38,6 +41,9 @@ private:
     thread _video_decode_thread;
     thread _audio_decode_thread;
 
-    unique_ptr<FormatConverter> _format_converter;
+    unique_ptr<AudioFormatConverter> _audio_format_converter;
+    unique_ptr<VideoFormatConverter> _video_format_converter;
     unique_ptr<Display> _displayer;
+    double _audio_pts = 0.0;
+    mutex _audio_pts_mtx;
 };

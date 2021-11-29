@@ -10,6 +10,7 @@ public:
     bool push(T&& msg);
     bool push(const T& msg);
     bool pop(T& msg);
+    bool try_pop(T& msg);
     void end_input();
     void quit();
     size_t size();
@@ -82,6 +83,26 @@ bool Queue<T>::pop(T& msg) {
     }
     return false;
 }
+
+template<class T>
+bool Queue<T>::try_pop(T& msg) {
+    unique_lock<mutex> lock(_mtx);
+
+    while (!_quit) {
+        if (!_msgs.empty()) {
+            msg = move(_msgs.front());
+            _msgs.pop();
+            _not_full.notify_all();
+            return true;
+        }
+        if (_end_input) {
+            return false;
+        }
+        return false;
+    }
+    return false;
+}
+
 
 template<class T>
 void Queue<T>::end_input() {

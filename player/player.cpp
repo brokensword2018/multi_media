@@ -21,10 +21,14 @@ Player::Player(const string& filename) {
     _video_decoder.reset(new Decoder(_demuxer->video_stream()->codecpar));
     _audio_decoder.reset(new Decoder(_demuxer->audio_stream()->codecpar));
 
-     _format_converter.reset(new FormatConverter(
+     _video_format_converter.reset(new VideoFormatConverter(
         _video_decoder->codec_context()->width, _video_decoder->codec_context()->height,
         _video_decoder->codec_context()->pix_fmt, AV_PIX_FMT_YUV420P));
-    _displayer.reset(new Display(_video_decoder->codec_context()->width, _video_decoder->codec_context()->height));
+    _audio_format_converter.reset(new AudioFormatConverter(AV_SAMPLE_FMT_S16,
+    _demuxer->audio_stream()->codecpar->channels, 
+    _demuxer->audio_stream()->codecpar->channel_layout,
+    _demuxer->audio_stream()->codecpar->sample_rate));
+    _displayer.reset(new Display(_video_decoder->codec_context()->width, _video_decoder->codec_context()->height, _demuxer->audio_stream()->codecpar, this));
 }
 
 void Player::play() {
@@ -85,7 +89,7 @@ void Player::decode_audio() {
             while (_audio_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
                 // ilog << frame->pts * av_q2d(_demuxer->audio_stream()->time_base);
-                // TODO 处理解码的帧
+                convert_audio_frame(frame);
             }
         }
     }
@@ -102,7 +106,7 @@ void Player::decode_audio() {
         else if (ret == 0) {
             frame_count += 1;
             ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
-            // TODO 处理解码的帧
+            convert_audio_frame(frame);
         } 
         else if (ret == AVERROR_EOF) {
             ilog << "end of the decoder";
@@ -111,6 +115,14 @@ void Player::decode_audio() {
     }
     ilog << "packet num " << packet_count << " frame num " << frame_count;
 }
+
+void Player::convert_audio_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame) {
+    unique_ptr<AVFrame, function<void(AVFrame*)>> frame_converted( av_frame_alloc(), [](AVFrame* p){ av_frame_free(&p); } );
+    (*_audio_format_converter)(frame.get(), frame_converted.get());
+    _audio_frame_queue->push(move(frame_converted));
+}
+
+
 
 void Player::decode_video() {
     set_thread_name("video decoder");
@@ -129,7 +141,7 @@ void Player::decode_video() {
             while (_video_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
                 //ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
-                convert_frame(frame);
+                convert_video_frame(frame);
             }
         }
     }
@@ -147,7 +159,7 @@ void Player::decode_video() {
         else if (ret == 0) {
             frame_count += 1;
             //ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
-            convert_frame(frame);
+            convert_video_frame(frame);
         } 
         else if (ret == AVERROR_EOF) {
             ilog << "end of the decoder";
@@ -159,18 +171,20 @@ void Player::decode_video() {
     ilog << "packet num " << packet_count << " frame num " << frame_count;
 }
 
-void Player::convert_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame) {
+void Player::convert_video_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame) {
     unique_ptr<AVFrame, function<void(AVFrame*)>> frame_converted(av_frame_alloc(), [](AVFrame* p) { av_free(p->data[0]); });
 
     ffmpeg::check(av_frame_copy_props(frame_converted.get(), frame.get()));
     ffmpeg::check(av_image_alloc(frame_converted->data, frame_converted->linesize, _video_decoder->codec_context()->width,
     _video_decoder->codec_context()->height, _video_decoder->codec_context()->pix_fmt, 1));
-    (*_format_converter)(frame.get(), frame_converted.get());
+    (*_video_format_converter)(frame.get(), frame_converted.get());
     _video_frame_queue->push(move(frame_converted));
 }
 
 
 void Player::display() {
+    double last_pts = 0.0;
+    ilog << "start";
     for (int frame_num = 0; ; frame_num++) {
 
         _displayer->input();
@@ -179,19 +193,62 @@ void Player::display() {
             break;
         }
 
+        if (!_displayer->get_play()) {
+            _displayer->stop_play_audio();
+            continue;
+        } else {
+            _displayer->start_play_audio();
+        }
 
-        unique_ptr<AVFrame, function<void(AVFrame*)>> frame;
-        if (!_video_frame_queue->pop(frame)) {
-            ilog << "frame_num " << frame_num;
+
+
+        // 视频播放
+        unique_ptr<AVFrame, function<void(AVFrame*)>> video_frame;
+        if (!_video_frame_queue->pop(video_frame)) {
+            //ilog << "frame_num " << frame_num;
             break;
         }
-        ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+        //ilog <<  "pts "  << video_frame->pts << "  " << video_frame->pts * av_q2d(_demuxer->video_stream()->time_base);
         _displayer->refresh(
-					{frame->data[0], frame->data[1], frame->data[2]},
-					{static_cast<size_t>(frame->linesize[0]),
-					 static_cast<size_t>(frame->linesize[1]),
-					 static_cast<size_t>(frame->linesize[2])});
-        usleep(41 * 1000);
+					{video_frame->data[0], video_frame->data[1], video_frame->data[2]},
+					{static_cast<size_t>(video_frame->linesize[0]),
+					 static_cast<size_t>(video_frame->linesize[1]),
+					 static_cast<size_t>(video_frame->linesize[2])});
+        if (!last_pts) {
+            usleep(40 * 1000);
+            last_pts = video_frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+        }
+        else {
+            double cur_pts = video_frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+            lock_guard<mutex> lock(_audio_pts_mtx);
+            double diff = last_pts - _audio_pts; // 根据diff做音视频同步
+            ilog << "video pts " << last_pts << " audio pts " << _audio_pts << " diff " << last_pts - _audio_pts;
+            if (diff < 0.0) {
+                usleep((cur_pts - last_pts) * 0.7 * 1000 * 1000);
+            } else if (diff > 0.0) {
+                usleep((cur_pts - last_pts) * 1.3 * 1000 * 1000);
+            } else {
+                usleep((cur_pts - last_pts) * 1000 * 1000);
+            }
+            last_pts = cur_pts;
+        }
+        
     }
+    ilog << "end";
+    _video_packet_queue->quit();
+    _audio_packet_queue->quit();
+    _video_frame_queue->quit();
+    _audio_frame_queue->quit();
+}
 
+string Player::get_pcm() {
+    lock_guard<mutex> lock(_audio_pts_mtx);
+    unique_ptr<AVFrame, function<void(AVFrame*)>> audio_frame;
+    if (_audio_frame_queue->try_pop(audio_frame)) {
+        size_t len = audio_frame->nb_samples * audio_frame->channels * av_get_bytes_per_sample((enum AVSampleFormat)audio_frame->format);
+        _audio_pts = audio_frame->pts * av_q2d(_demuxer->audio_stream()->time_base);
+        return string((char*)(audio_frame->data[0]), len);
+    } else {
+        return "";
+    }
 }
