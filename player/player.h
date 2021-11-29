@@ -4,6 +4,7 @@
 
 #include "demuxer.h"
 #include "decoder.h"
+#include "format_converter.h"
 
 
 struct AVPacket;
@@ -19,6 +20,7 @@ private:
     void demux();
     void decode_audio();
     void decode_video();
+    void convert_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame);
 
 private:
     unique_ptr<Demuxer> _demuxer;
@@ -33,4 +35,6 @@ private:
     thread _demux_thread;
     thread _video_decode_thread;
     thread _audio_decode_thread;
+
+    unique_ptr<FormatConverter> _format_converter;
 };

@@ -4,6 +4,13 @@
 #include "ffmpeg.h"
 
 
+extern "C" {
+	#include <libavcodec/avcodec.h>
+	#include <libavutil/time.h>
+	#include <libavutil/imgutils.h>
+}
+
+
 void Player::play(const string& filename) {
     _demuxer.reset(new Demuxer(filename));
     _video_packet_queue.reset(new PacketQueue(40));
@@ -18,6 +25,9 @@ void Player::play(const string& filename) {
     _audio_decode_thread = thread(&Player::decode_audio, this);
     _video_decode_thread = thread(&Player::decode_video, this);
 
+    _format_converter.reset(new FormatConverter(
+        _video_decoder->codec_context()->width, _video_decoder->codec_context()->height,
+        _video_decoder->codec_context()->pix_fmt, AV_PIX_FMT_YUV420P));
 
     _demux_thread.join();
     _audio_decode_thread.join();
@@ -74,17 +84,21 @@ void Player::decode_audio() {
         unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
         int ret = _audio_decoder->receive(frame.get());
         if (ret == AVERROR(EAGAIN)) {
+            ilog << "flush the decoder";
             if (!_audio_decoder->send(nullptr)) {
                 elog << " fail to flush video decoder";
             }
             continue;
-        } else if (ret == 0) {
-            frame_count += 1;
-            // ilog << "pts " << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
-            // TODO 处理解码的帧
-        } else if (ret == AVERROR_EOF) {
-            break;
         }
+        else if (ret == 0) {
+            frame_count += 1;
+            ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+            // TODO 处理解码的帧
+        } 
+        else if (ret == AVERROR_EOF) {
+            ilog << "end of the decoder";
+            break;
+        } 
     }
     ilog << "packet num " << packet_count << " frame num " << frame_count;
 }
@@ -106,7 +120,7 @@ void Player::decode_video() {
             while (_video_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
                 // ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
-                // TODO 处理解码的帧
+                convert_frame(frame);
             }
         }
     }
@@ -115,6 +129,7 @@ void Player::decode_video() {
         unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
         int ret = _video_decoder->receive(frame.get());
         if (ret == AVERROR(EAGAIN)) {
+            ilog << "flush the decoder";
             if (!_video_decoder->send(nullptr)) {
                 elog << " fail to flush video decoder";
             }
@@ -122,13 +137,25 @@ void Player::decode_video() {
         }
         else if (ret == 0) {
             frame_count += 1;
-            // ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
-            // TODO 处理解码的帧
+            ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+            convert_frame(frame);
         } 
         else if (ret == AVERROR_EOF) {
+            ilog << "end of the decoder";
+            _video_frame_queue->end_input();
             break;
         } 
     }
 
     ilog << "packet num " << packet_count << " frame num " << frame_count;
+}
+
+void Player::convert_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame) {
+    unique_ptr<AVFrame, function<void(AVFrame*)>> frame_converted(av_frame_alloc(), [](AVFrame* p) { av_free(p->data[0]); });
+
+    ffmpeg::check(av_frame_copy_props(frame_converted.get(), frame.get()));
+    ffmpeg::check(av_image_alloc(frame_converted->data, frame_converted->linesize, _video_decoder->codec_context()->width,
+    _video_decoder->codec_context()->height, _video_decoder->codec_context()->pix_fmt, 1));
+    (*_format_converter)(frame.get(), frame_converted.get());
+    _video_frame_queue->push(move(frame_converted));
 }
