@@ -11,7 +11,7 @@ extern "C" {
 }
 
 
-void Player::play(const string& filename) {
+Player::Player(const string& filename) {
     _demuxer.reset(new Demuxer(filename));
     _video_packet_queue.reset(new PacketQueue(40));
     _audio_packet_queue.reset(new PacketQueue(40));
@@ -21,19 +21,28 @@ void Player::play(const string& filename) {
     _video_decoder.reset(new Decoder(_demuxer->video_stream()->codecpar));
     _audio_decoder.reset(new Decoder(_demuxer->audio_stream()->codecpar));
 
+     _format_converter.reset(new FormatConverter(
+        _video_decoder->codec_context()->width, _video_decoder->codec_context()->height,
+        _video_decoder->codec_context()->pix_fmt, AV_PIX_FMT_YUV420P));
+    _displayer.reset(new Display(_video_decoder->codec_context()->width, _video_decoder->codec_context()->height));
+}
+
+void Player::play() {
+    
+
     _demux_thread = thread(&Player::demux, this);
     _audio_decode_thread = thread(&Player::decode_audio, this);
     _video_decode_thread = thread(&Player::decode_video, this);
 
-    _format_converter.reset(new FormatConverter(
-        _video_decoder->codec_context()->width, _video_decoder->codec_context()->height,
-        _video_decoder->codec_context()->pix_fmt, AV_PIX_FMT_YUV420P));
+
+    display();
 
     _demux_thread.join();
     _audio_decode_thread.join();
     _video_decode_thread.join();
     ilog << "all thread end";
 }
+
 
 void Player::demux() {
     set_thread_name("demux");
@@ -119,7 +128,7 @@ void Player::decode_video() {
             unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
             while (_video_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
-                // ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+                //ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
                 convert_frame(frame);
             }
         }
@@ -137,7 +146,7 @@ void Player::decode_video() {
         }
         else if (ret == 0) {
             frame_count += 1;
-            ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+            //ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
             convert_frame(frame);
         } 
         else if (ret == AVERROR_EOF) {
@@ -158,4 +167,31 @@ void Player::convert_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame)
     _video_decoder->codec_context()->height, _video_decoder->codec_context()->pix_fmt, 1));
     (*_format_converter)(frame.get(), frame_converted.get());
     _video_frame_queue->push(move(frame_converted));
+}
+
+
+void Player::display() {
+    for (int frame_num = 0; ; frame_num++) {
+
+        _displayer->input();
+        if (_displayer->get_quit()) {
+            ilog << "quit play";
+            break;
+        }
+
+
+        unique_ptr<AVFrame, function<void(AVFrame*)>> frame;
+        if (!_video_frame_queue->pop(frame)) {
+            ilog << "frame_num " << frame_num;
+            break;
+        }
+        ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+        _displayer->refresh(
+					{frame->data[0], frame->data[1], frame->data[2]},
+					{static_cast<size_t>(frame->linesize[0]),
+					 static_cast<size_t>(frame->linesize[1]),
+					 static_cast<size_t>(frame->linesize[2])});
+        usleep(41 * 1000);
+    }
+
 }

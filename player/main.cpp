@@ -29,14 +29,14 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        Player player;
-        player.play(argv[1]);
+        Player player(argv[1]);
+        player.play();
     }
     catch(const std::exception& e) {
-        cerr << e.what() << '\n';
+        ilog << e.what() << '\n';
     }
     catch(...) {
-        cerr << "unknown exception" << '\n';
+        ilog << "unknown exception" << '\n';
     }
     
 

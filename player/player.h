@@ -5,6 +5,7 @@
 #include "demuxer.h"
 #include "decoder.h"
 #include "format_converter.h"
+#include "display.h"
 
 
 struct AVPacket;
@@ -13,14 +14,15 @@ using FrameQueue = Queue<unique_ptr<AVFrame, function<void(AVFrame*)>>>;
 
 class Player {
 public:
-    Player() = default;
-    void play(const string& filename);
+    Player(const string& filename);
+    void play();
 
 private:
     void demux();
     void decode_audio();
     void decode_video();
     void convert_frame(unique_ptr<AVFrame, function<void(AVFrame*)>>& frame);
+    void display();
 
 private:
     unique_ptr<Demuxer> _demuxer;
@@ -37,4 +39,5 @@ private:
     thread _audio_decode_thread;
 
     unique_ptr<FormatConverter> _format_converter;
+    unique_ptr<Display> _displayer;
 };
