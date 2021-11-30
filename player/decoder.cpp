@@ -5,7 +5,7 @@
 
 
 Decoder::Decoder(const AVCodecParameters* codec_par) {
-    AVCodec* codec = avcodec_find_decoder(codec_par->codec_id);
+    auto codec = avcodec_find_decoder(codec_par->codec_id);
     if (!codec) {
         throw ffmpeg::FfmpegError(StrPrinter << "find decoder fail unsupported codec id" << codec_par->codec_id);
     }
