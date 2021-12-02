@@ -228,7 +228,7 @@ void Player::display() {
             } else {
                 sleep_duration = fabs(cur_pts - last_pts) * 1.0 * 1000 * 1000;
             }
-            ilog << "video pts " << last_pts << " audio pts " << _audio_pts << " diff " << last_pts - _audio_pts << " sleep " << sleep_duration;
+            ilog << "video pts " << last_pts << " audio pts " << _audio_pts << " diff " << last_pts - _audio_pts << " sleep " << sleep_duration / 1000 << " ms";
             usleep(sleep_duration);
             last_pts = cur_pts;
         }
