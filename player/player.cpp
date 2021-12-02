@@ -13,10 +13,10 @@ extern "C" {
 
 Player::Player(const string& filename) {
     _demuxer.reset(new Demuxer(filename));
-    _video_packet_queue.reset(new PacketQueue(40));
-    _audio_packet_queue.reset(new PacketQueue(40));
-    _video_frame_queue.reset(new FrameQueue(40));
-    _audio_frame_queue.reset(new FrameQueue(40));
+    _video_packet_queue.reset(new PacketQueue(512));
+    _audio_packet_queue.reset(new PacketQueue(512));
+    _video_frame_queue.reset(new FrameQueue(1000));
+    _audio_frame_queue.reset(new FrameQueue(1000));
 
     _video_decoder.reset(new Decoder(_demuxer->video_stream()->codecpar));
     _audio_decoder.reset(new Decoder(_demuxer->audio_stream()->codecpar));
@@ -221,12 +221,18 @@ void Player::display() {
             lock_guard<mutex> lock(_audio_pts_mtx);
             double diff = last_pts - _audio_pts; // 根据diff做音视频同步
             double sleep_duration = 0.0;
-            if (diff < 0.0) {
+            if (cur_pts < last_pts) {
+                sleep_duration = 10000;
+            }
+            else if (diff < 0.0) {
                 sleep_duration = fabs(cur_pts - last_pts) * 0.7 * 1000 * 1000;
             } else if (diff > 0.0) {
                 sleep_duration = fabs(cur_pts - last_pts) * 1.3 * 1000 * 1000;
             } else {
                 sleep_duration = fabs(cur_pts - last_pts) * 1.0 * 1000 * 1000;
+            }
+            if (sleep_duration > 100000) {
+                sleep_duration = 30000.0;
             }
             ilog << "video pts " << last_pts << " audio pts " << _audio_pts << " diff " << last_pts - _audio_pts << " sleep " << sleep_duration / 1000 << " ms";
             usleep(sleep_duration);
