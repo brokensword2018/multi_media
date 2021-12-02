@@ -88,7 +88,7 @@ void Player::decode_audio() {
             unique_ptr<AVFrame, function<void(AVFrame*)>> frame(av_frame_alloc(), [](AVFrame* p) { av_frame_free(&p); } );
             while (_audio_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
-                // ilog << frame->pts * av_q2d(_demuxer->audio_stream()->time_base);
+                ilog << frame->pts * av_q2d(_demuxer->audio_stream()->time_base);
                 convert_audio_frame(frame);
             }
         }
@@ -140,7 +140,7 @@ void Player::decode_video() {
             unique_ptr<AVFrame, function<void(AVFrame *)>> frame(av_frame_alloc(), [](AVFrame *p) { av_frame_free(&p); });
             while (_video_decoder->receive(frame.get()) == 0) {
                 frame_count += 1;
-                //ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
+                ilog <<  "pts "  << frame->pts << "  " << frame->pts * av_q2d(_demuxer->video_stream()->time_base);
                 convert_video_frame(frame);
             }
         }
@@ -205,10 +205,8 @@ void Player::display() {
         // 视频播放
         unique_ptr<AVFrame, function<void(AVFrame*)>> video_frame;
         if (!_video_frame_queue->pop(video_frame)) {
-            //ilog << "frame_num " << frame_num;
             break;
         }
-        //ilog <<  "pts "  << video_frame->pts << "  " << video_frame->pts * av_q2d(_demuxer->video_stream()->time_base);
         _displayer->refresh(
 					{video_frame->data[0], video_frame->data[1], video_frame->data[2]},
 					{static_cast<size_t>(video_frame->linesize[0]),
@@ -222,14 +220,16 @@ void Player::display() {
             double cur_pts = video_frame->pts * av_q2d(_demuxer->video_stream()->time_base);
             lock_guard<mutex> lock(_audio_pts_mtx);
             double diff = last_pts - _audio_pts; // 根据diff做音视频同步
-            ilog << "video pts " << last_pts << " audio pts " << _audio_pts << " diff " << last_pts - _audio_pts;
+            double sleep_duration = 0.0;
             if (diff < 0.0) {
-                usleep((cur_pts - last_pts) * 0.7 * 1000 * 1000);
+                sleep_duration = fabs(cur_pts - last_pts) * 0.7 * 1000 * 1000;
             } else if (diff > 0.0) {
-                usleep((cur_pts - last_pts) * 1.3 * 1000 * 1000);
+                sleep_duration = fabs(cur_pts - last_pts) * 1.3 * 1000 * 1000;
             } else {
-                usleep((cur_pts - last_pts) * 1000 * 1000);
+                sleep_duration = fabs(cur_pts - last_pts) * 1.0 * 1000 * 1000;
             }
+            ilog << "video pts " << last_pts << " audio pts " << _audio_pts << " diff " << last_pts - _audio_pts << " sleep " << sleep_duration;
+            usleep(sleep_duration);
             last_pts = cur_pts;
         }
         
