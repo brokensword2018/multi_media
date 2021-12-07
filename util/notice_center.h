@@ -36,7 +36,7 @@ public:
         }
         auto iter = copy.find(event);
         if (iter != copy.end()) {
-            cb_type* cb = cb_type(iter->second);
+            cb_type* cb = (cb_type*)(iter->second.get());
             (*cb)(std::forward<ArgTypes>(args)...);
         }
     }
