@@ -3,6 +3,8 @@
 #include "common.h"
 #include "singleton.h"
 #include "function_traits.h"
+#include <boost/type_index.hpp>
+using boost::typeindex::type_id_with_cvr;
 
 class NoticeCenter {
 public:
@@ -14,6 +16,8 @@ public:
             cb_type *p = (cb_type *)ptr;
             delete p;
         });
+
+        // ilog << " type：" << type_id_with_cvr<cb_type>().pretty_name(); 
 
         {
             lock_guard<mutex> lock(_cb_mtx);
@@ -29,6 +33,7 @@ public:
     template<typename ...ArgTypes>
     void emit_event(const string& event, ArgTypes&& ...args) {
         using cb_type = function<void(decltype(std::forward<ArgTypes>(args))...)>;
+        // ilog << " type：" << type_id_with_cvr<cb_type>().pretty_name(); // 需要与add_listener 中的cb_type必须要一样，否则会发生不可预知的错误。
         decltype(_event_to_cbs) copy; // copy一份，防止回调中操作NoticeCenter造成死锁。
         {
             lock_guard<mutex> lock(_cb_mtx);

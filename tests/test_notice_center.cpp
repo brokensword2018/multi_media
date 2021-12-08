@@ -18,26 +18,35 @@ using namespace std;
 const string event1 = "event1";
 const string event2 = "event2";
 
-
 int main() {
 
-    NoticeCenter::instance().add_listener(
-        event1, [](int &a, const char *&b, double &c, string &d) { ilog << a << " " << b << " " << c << " " << d; 
+    NoticeCenter::instance().add_listener(event1, [](int &a, const char *&b, double &c, string &d) {
+        dlog << a << " " << b << " " << c << " " << d;
         a++;
         NoticeCenter::instance().delete_listener(event1);
-        NoticeCenter::instance().add_listener(event1, [](int &a, const char *&b, double &c, string &d) { dlog << a << " " << b << " " << c << " " << d;});
+        NoticeCenter::instance().add_listener(event1, [](int &a, const char *&b, double &c, string &d) {
+            ilog << a << " " << b << " " << c << " " << d;
+        });
     });
-    
+
+    NoticeCenter::instance().add_listener(event2, [](string& d, double& c, const char* &b, int& a) {
+        ilog << a << " " << b << " " << c << " " << d;
+        NoticeCenter::instance().delete_listener(event2);
+        NoticeCenter::instance().add_listener(event2, [](string& d, double& c, const char* &b, int& a) {
+            dlog << a << " " << b << " " << c << " " << d;
+        });
+    });
+
     int a = 1;
     const char* b = "b";
     double c = 3.14;
     string d = "d";
-    while (true)
-    {
+    while (true) {
         NoticeCenter::instance().emit_event(event1, a, b, c, d);
+        NoticeCenter::instance().emit_event(event2, d, c, (const char *)"b", a);
         sleep(1);
     }
-    
+
     AsyncLogWriter::instance().join();
     return 0;
 }
